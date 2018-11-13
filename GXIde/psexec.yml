@@ -1,0 +1,36 @@
+--- 
+# This playbook downloads and installs PSEXEC
+
+- hosts: all
+  gather_facts: True
+  vars:
+   #remote
+   psexec_download_url: https://download.sysinternals.com/files/PSTools.zip
+   psexec_installer_folder: c:\psexec
+
+  tasks:
+   - name: create a directory for PSEXEC 
+     win_file: 
+        path: "{{ psexec_installer_folder }}"
+        state: directory
+
+   - name: check if PSEXEC installer file already exists in ENV
+     win_stat:
+        path: "{{ psexec_installer_folder }}/pstools.zip"
+     register: psexec_installer_file
+
+   - name: download PSEXEC installer to the ENV (if not exists)
+     win_get_url:
+          url: '{{ psexec_download_url }}' 
+          dest: '{{ psexec_installer_folder }}/pstools.zip'
+     when: not psexec_installer_file.stat.exists
+
+   - name: Unzip 
+     win_unzip:
+       src: '{{ psexec_installer_folder }}/pstools.zip'
+       dest: '{{ psexec_installer_folder }}'
+
+   - name: Ensure that psExec is present on the global system path
+     win_path:
+       elements:
+       - '{{ psexec_installer_folder }}'

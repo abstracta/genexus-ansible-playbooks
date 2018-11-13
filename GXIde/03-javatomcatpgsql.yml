@@ -1,0 +1,24 @@
+--- 
+# This playbook installs Jdk8, Tomcat 8 and Postgresql
+# 
+
+- hosts: all
+  gather_facts: True
+  tasks:
+    - name: Install java development kit 
+      win_chocolatey: 
+        name: jdk8
+        state: present
+
+    - name: Install Tomcat 8
+      win_chocolatey:
+        name: tomcat
+        version: 8.0.33
+        state: present
+
+    - name: Install Postgresql
+      win_chocolatey:
+        name: postgresql9
+        state: present
+        params: "/Password:postgres"
+

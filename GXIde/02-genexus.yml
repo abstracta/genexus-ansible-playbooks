@@ -1,0 +1,33 @@
+- hosts: all
+  gather_facts: True
+  #become: yes
+  #become_method: sudo
+
+  tasks:
+    - debug: var=hostvars[inventory_hostname]
+
+    - name: Create a directory for installer download
+      win_file: 
+        path: c:\genexus
+        state: directory
+
+    - name: check if genexus setup file exists
+      win_stat:
+        path: c:\genexus\genexus15u6.exe
+      register: installer_file
+
+    - name: get the genexus installer
+      win_get_url:
+        url: 'https://files.genexus.com/files/1538650603/genexus15u6.exe'
+        dest: 'c:\genexus\genexus15u6.exe'
+      when: not installer_file.stat.exists
+
+    - name: Install GeneXus
+      win_command: c:\genexus\genexus15u6.exe /s INSTALLDIR="C:\Program Files (x86)\GeneXus"
+      args:
+       chdir: c:\genexus
+
+   - name: Update license manager config file
+     win_template: 
+       src: files/protect.ini.j2
+       dest: 'C:\Program Files (x86)\GeneXus\Protect.ini'

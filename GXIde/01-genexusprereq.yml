@@ -1,0 +1,124 @@
+--- 
+# This playbook downloads and installs the following GeneXus 16 
+# IDE pre-requisites: 
+# 
+# .- .Net Framework 3.5
+# .- SQLServer Express x64 (download / install / restart service)
+# .- .Net Framework 4.6.1
+
+
+- hosts: all
+  gather_facts: True
+  vars:
+   # remote: 
+   sql_instance_name: sqlexpress
+   sql_installer_folder: c:\sql
+   sql_download_url: http://download.microsoft.com/download/E/A/E/EAE6F7FC-767A-4038-A954-49B8B05D04EB/ExpressAndTools%2064BIT/SQLEXPRWT_x64_ENU.exe
+   netfwk_download_url: https://download.microsoft.com/download/E/4/1/E4173890-A24A-4936-9FC9-AF930FE3FA40/NDP461-KB3102436-x86-x64-AllOS-ENU.exe
+   netfwk_product_id: {BD6F5371-DAC1-30F0-9DDE-CAC6791E28C3}
+
+  # local:
+   local_files: ../files
+   ini_file_name: sql_conf.ini
+
+  tasks:
+   - name: create a directory for SQLSERVER installer download
+     win_file: 
+        path: "{{ sql_installer_folder }}"
+        state: directory
+
+   - name: create a directory for SQLSERVER installer extraction
+     win_file: 
+        path: "{{ sql_installer_folder }}/installer"
+        state: directory
+
+   - name: copy previously defined SQLSERVER conf file
+     win_template: 
+       src: "{{local_files}}/{{ ini_file_name }}.j2"
+       dest: "{{ sql_installer_folder }}/{{ ini_file_name }}"
+
+   - name: Install SQLSERVER pre-requisite net-framework-35
+     win_feature:
+        name: NET-Framework-Core
+        state: present
+
+   - name: check if SQLSERVER installer file already exists in ENV
+     win_stat:
+        path: "{{ sql_installer_folder }}/sql_installer.exe"
+     register: installer_file
+
+   - name: download SQLSERVER installer to the ENV (if not exists)
+     win_get_url:
+          url: '{{ sql_download_url }}' 
+          dest: '{{ sql_installer_folder }}/sql_installer.exe'
+     when: not installer_file.stat.exists
+
+   - name: Extract SQLSERVER installer
+     win_command: '"{{ sql_installer_folder }}/sql_installer.exe" /q /x:"{{ sql_installer_folder }}/installer"'
+     args:
+      chdir: "{{ sql_installer_folder }}"
+      creates: "{{ sql_installer_folder }}/installer/setup.exe"
+
+   - name: Install SQLSERVER DBMS
+     win_command: '{{ sql_installer_folder }}/installer/setup.exe /configurationfile={{ sql_installer_folder }}/{{ ini_file_name }}'
+     args:
+      chdir: "{{ sql_installer_folder }}"
+
+   - name: Add / Update registry for SQLSERVER TCP port
+     win_regedit:
+       path: 'HKLM:\Software\Microsoft\Microsoft SQL Server\MSSQL12.{{ sql_instance_name }}\MSSQLServer\SuperSocketNetLib\Tcp\IPAll'
+       name: TcpPort
+       data: 1433
+     register: win_reg
+
+   - name: Restart MSSSQL service
+     win_service:
+       name: 'MSSQL${{ sql_instance_name }}'
+       force_dependent_services: yes
+       state: restarted
+     when: win_reg.changed
+
+   - name: Install .NET framework 4.6.1
+     win_package:
+        path: "{{ netfwk_download_url }}"
+        product_id: "{{ netfwk_product_id }}"
+        state: present
+        arguments: /q /norestart
+
+    #This is not needed but very usefull for .NET Env:
+   - name: Enable .NET Windows features
+     win_feature:
+       name: Web-server,
+          Web-WebServer,
+          Web-Common-Http,
+          Web-Default-Doc,
+          Web-Dir-Browsing,
+          Web-Http-Errors,
+          Web-Static-Content,
+          Web-Http-Redirect,
+          Web-DAV-Publishing,
+          Web-Health,
+          Web-Http-Logging,
+          Web-Request-Monitor,
+          Web-Security,
+          Web-Filtering,
+          Web-Windows-Auth,
+          Web-Basic-Auth,
+          Web-App-Dev,
+          Web-Net-Ext45,
+          Web-ASP,
+          Web-Asp-Net45,
+          Web-Isapi-Filter,
+          Web-Isapi-Ext,
+          Net-Framework-45-Features,
+          NET-Framework-45-ASPNET
+       state: present
+
+    #This is not needed but very usefull for SQLServer:
+   - name: Install IIS Management Features
+     win_feature:
+       name: Web-Mgmt-Tools,
+          Web-Mgmt-Console,
+          Web-Mgmt-Compat,
+          Web-Mgmt-Service
+       state: present

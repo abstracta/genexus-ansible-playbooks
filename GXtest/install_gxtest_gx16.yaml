@@ -1,0 +1,47 @@
+# This script is an example about using an Ansible playbook for downloading and 
+# installing latest STAGING release version of GXtest for GeneXus 16
+# 
+# Prerequisites: 
+# .- Installed GeneXus v16 on the Remote HOST 
+# .- defined environment variable named GX_PATH (poiting to GX installation)
+# .- GeneXus IDE must be closed to enable the extension installation.
+#
+
+- hosts: all
+  gather_facts: True
+  vars:
+  - gxtest_folder: c:\gxtest_installer
+  # => Change this value to 'master' to get latest stable version.
+  - gxtest_branch: staging 
+
+  tasks:
+    - debug: 
+        msg: "{{ ansible_env.GX_PATH }}"
+
+    - name: Create a directory for installer download
+      win_file: 
+        path: "{{ gxtest_folder }}"
+        state: directory
+
+    - name: Check if setup file already exists
+      win_stat:
+        path: "{{ gxtest_folder }}\\GXTest16.zip"
+      register: gxtest_installer_file
+
+    - name: Download GXtest zip - {{ gxtest_branch }} branch
+      win_get_url:
+        url: 'https://s3-us-west-2.amazonaws.com/abstracta/GXTest/{{ gxtest_branch }}/GXTest16.zip'
+        dest: "{{ gxtest_folder }}\\GXTest16.zip"
+      when: not gxtest_installer_file.stat.exists
+
+    - name: Unzip GXtest to LATESTGX
+      win_unzip:
+        src: "{{ gxtest_folder }}\\GXTest16.zip"
+        dest: "{{ ansible_env.GX_PATH }}"
+        delete_archive: yes
+
+    - name: Install GXtest Extension 
+      win_psexec:
+        command: '"{{ ansible_env.GX_PATH }}\\genexus.exe" /install /measureCommandTime'
+        interactive: yes
+        chdir: "{{ ansible_env.GX_PATH }}"
