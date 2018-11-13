@@ -1,0 +1,57 @@
+--- 
+# This playbook downloads and installs GeneXus Beta version 
+#  
+# 
+# Pre-requisites: PSexc 2.2 installed https://docs.microsoft.com/en-us/sysinternals/downloads/psexec
+# There is a playbook on 
+
+
+- hosts: all
+  gather_facts: True
+  vars:
+   # remote: 
+   copy_gx_license: no
+   install_folder: C:\genexus
+   installer_name: genexus_setup_128435.exe
+   gx_folder: C:\Program Files (x86)\GeneXus\GeneXusBeta
+   gx_url_download: https://files.genexus.com/files/1541127101/genexus_setup_128435.exe
+
+  # local:
+   local_files: ../files
+   ini_license_file_name: protect.ini
+
+  tasks:
+    - name: Create a directory for installer download
+      win_file: 
+        path: "{{ install_folder }}"
+        state: directory
+
+    - name: check if genexus setup file exists
+      win_stat:
+        path: '{{ install_folder }}\{{ installer_name }}'
+      register: installer_file
+
+    - name: get Genexus Beta installer
+      win_get_url:
+        url: "{{ gx_url_download }}"
+        dest: '{{ install_folder }}\{{ installer_name }}'
+      when: not installer_file.stat.exists
+
+    # - name: Install GeneXus using win_command works only on some installers i.e: Japaneese version
+    #   win_command: c:\genexus\genexus_setup_128435.exe /s INSTALLDIR="C:\Program Files (x86)\GeneXus"
+    #   args:
+    #    chdir: c:\genexus
+
+    #This instead, while always successfully installs genexus, sometimes return timeout error. 
+    - name: Install GeneXus IDE 
+      win_psexec:
+        command: '"{{ install_folder }}\{{ installer_name }}" /s INSTALLDIR="{{ gx_folder }}"'
+        interactive: yes
+        elevated: yes
+        chdir: "{{ install_folder }}"
+
+    - name: Update license manager config file
+      win_template: 
+        src: "{{local_files}}/{{ ini_license_file_name }}.j2"
+        dest: "{{ install_folder }}/{{ ini_license_file_name }}"
+      when: copy_gx_license

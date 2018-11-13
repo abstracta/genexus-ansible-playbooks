@@ -1,0 +1,93 @@
+# This script is an example about using an Ansible playbook for
+# installing GXServer 
+# 
+# Also installs & configure:
+# .- IIS
+# .- NET Framework 4.7.1
+# 
+
+- hosts: all
+  gather_facts: True
+  vars:
+   # remote: 
+   gxserver_im_installer_folder: c:\gxserverinstaller
+   gxserver_im_folder: C:\Program Files (x86)\GeneXus\GxserverInstanceManager
+   gxserver_im_installer_file: gxserverinstancemanager16.exe
+   gxserver_installer_folder: c:\gxserver\gxserver16
+   gxserver_download_url: https://files.genexus.com/files/1539292059/gxserverinstancemanager16.exe
+   
+   instance_name: gxserver16
+   mssql_service_name: .\SQLEXPRESS  
+   
+   netfwk_download_url: https://download.microsoft.com/download/9/E/6/9E63300C-0941-4B45-A0EC-0008F96DD480/NDP471-KB4033342-x86-x64-AllOS-ENU.exe
+   netfwk_product_id: {0A0CADCF-78DA-33C4-A350-CD51849B9702}
+   
+  tasks:
+    - name: Create a directory for GXServer IM download
+      win_file: 
+        path: "{{ gxserver_im_installer_folder }}"
+        state: directory
+
+
+    - name: Enable .NET Windows features
+      win_feature:
+        name: Web-server,
+          Web-WebServer,
+          Web-Common-Http,
+          Web-Default-Doc,
+          Web-Dir-Browsing,
+          Web-Http-Errors,
+          Web-Static-Content,
+          Web-Http-Redirect,
+          Web-DAV-Publishing,
+          Web-Health,
+          Web-Http-Logging,
+          Web-Request-Monitor,
+          Web-Security,
+          Web-Filtering,
+          Web-Windows-Auth,
+          Web-Basic-Auth,
+          Web-App-Dev,
+          Web-Net-Ext45,
+          Web-ASP,
+          Web-Asp-Net45,
+          Web-Isapi-Filter,
+          Web-Isapi-Ext,
+          Net-Framework-45-Features,
+          NET-Framework-45-ASPNET
+        state: present
+
+    - name: Install .NET framework 4.7.1
+      win_package:
+        path: "{{ netfwk_download_url }}"
+        product_id: "{{ netfwk_product_id }}"
+        state: present
+        arguments: /q /norestart
+
+    - name: Check if GXServer IM setup file already exists on the ENV
+      win_stat:
+        path: "{{ gxserver_im_installer_folder }}/{{ gxserver_im_installer_file }}"
+      register: gxserver_installer_file
+
+    - name: get GXServer installer from internet
+      win_get_url:
+        url: "{{ gxserver_download_url }}"
+        dest: "{{ gxserver_im_installer_folder }}/{{ gxserver_installer_file }}"
+      when: not gxserver_installer_file.stat.exists
+
+    - name: Install GXServer Instance Manager
+      win_command: '"{{ gxserver_im_installer_folder }}/{{ gxserver_installer_file }}" /s INSTALLDIR="{{ gxserver_im_folder }}"'
+      args:
+       chdir: c:\
+
+    - name: create GXServer installer folder
+      win_file: 
+        path: "{{ GXserver_installer_folder }}"
+        state: directory
+
+     #Check GXserverInstall.exe /h to list all install options. (usr, pwd, etc.) -- Also Japanese edition needs a /jp parameter.
+    - name: Install gxServer
+      win_command: GXserverInstall.exe add /InstanceName:{{ instance_name }} /InstallPath:"{{ GXserver_installer_folder }}" /SQLServer:{{ mssql_service_name }}
+      args:
+       chdir: "{{ gxserver_im_folder }}"
+
